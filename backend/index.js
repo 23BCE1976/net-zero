@@ -4,6 +4,7 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 
 import connectDB from "./config/connectDB.js";
+import userRouter from "./routes/user.route.js";
 
 dotenv.config();
 
@@ -19,6 +20,8 @@ app.use(
     credentials: true,
   }),
 );
+
+app.use("/api/user", userRouter);
 
 app.get("/", (request, response) => {
   return response.status(200).json({
