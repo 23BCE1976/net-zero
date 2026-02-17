@@ -43,6 +43,10 @@ const userSchema = new mongoose.Schema({
       timeStamp: {
         type: Date,
       },
+      verified: {
+        type: Boolean,
+        default: false,
+      }
     },
     validate: {
       validator: (otp) => {
