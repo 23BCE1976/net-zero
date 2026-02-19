@@ -46,7 +46,7 @@ const userSchema = new mongoose.Schema({
       verified: {
         type: Boolean,
         default: false,
-      }
+      },
     },
     validate: {
       validator: (otp) => {
@@ -54,6 +54,15 @@ const userSchema = new mongoose.Schema({
         return otp.value != null && otp.timeStamp != null;
       },
     },
+  },
+  groupIds: {
+    type: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "group"
+      },
+    ],
+    default: [],
   },
 });
 
