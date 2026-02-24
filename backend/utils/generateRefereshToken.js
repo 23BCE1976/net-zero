@@ -1,16 +1,14 @@
-import jwt from 'jsonwebtoken';
-import dotenv from 'dotenv';
-import userModel from '../models/user.model.js';
+import jwt from "jsonwebtoken";
 
-dotenv.config();
+import userModel from "../models/user.model.js";
 
-const generateRefreshToken = async(userId) => {
-  const token = jwt.sign({id : userId},process.env.SECRET_REFRESH_TOKEN,{
-    expiresIn : '7d'
-  })
-  const save = await userModel.findByIdAndUpdate(userId,{
-    refreshToken : token
-  })
+const generateRefreshToken = async (userId) => {
+  const token = jwt.sign({ id: userId }, process.env.SECRET_REFRESH_TOKEN, {
+    expiresIn: "7d",
+  });
+  await userModel.findByIdAndUpdate(userId, {
+    refreshToken: token,
+  });
   return token;
-}
+};
 export default generateRefreshToken;

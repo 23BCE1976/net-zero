@@ -5,6 +5,7 @@ import cors from "cors";
 
 import connectDB from "./config/connectDB.js";
 import userRouter from "./routes/user.route.js";
+import groupRouter from "./routes/group.route.js";
 
 dotenv.config();
 
@@ -22,10 +23,11 @@ app.use(
 );
 
 app.use("/api/user", userRouter);
+app.use("/api/group", groupRouter);
 
 app.get("/", (request, response) => {
   return response.status(200).json({
-    status: true, 
+    success: true,
     message: "API is running successfully",
     service: "Net Zero Backend",
     version: "1.0.0",

@@ -23,9 +23,9 @@ const groupSchema = new mongoose.Schema(
       ],
       default: [],
     },
-    inviteLink: {
+    joinCode: {
       type: String,
-      required: [true, "An invite link is required"],
+      required: [true, "An join code is required"],
     },
   },
   {
@@ -33,6 +33,8 @@ const groupSchema = new mongoose.Schema(
   },
 );
 
-const groupModel = mongoose.model("group", groupSchema);
+groupSchema.index({ members: 1 });
+
+const groupModel = mongoose.model("Group", groupSchema);
 
 export default groupModel;

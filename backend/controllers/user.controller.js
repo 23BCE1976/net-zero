@@ -1,4 +1,5 @@
 import bcryptjs from "bcryptjs";
+import crypto from "crypto";
 
 import userModel from "../models/user.model.js";
 
@@ -70,7 +71,7 @@ export const registerController = async (request, response) => {
   try {
     const { name, email, password } = request.body;
     if (!name || !email || !password) {
-      return response.status(400).json({
+      return response.status(409).json({
         message: "Please fill the required details",
         error: true,
         success: false,
@@ -90,15 +91,23 @@ export const registerController = async (request, response) => {
     const salt = await bcryptjs.genSalt(10);
     const hashPassword = await bcryptjs.hash(password, salt);
 
+    const emailVerificationCode = crypto.randomBytes(32).toString("hex");
+    const emailVerificationExpiry = Date.now() + 1000 * 60 * 60 * 24; // 1 day
+
     const payload = {
       name: name,
-      email: { value: email, verified: false },
+      email: {
+        value: email,
+        verified: false,
+        verificationCode: emailVerificationCode,
+        verificationExpiry: emailVerificationExpiry,
+      },
       password: hashPassword,
     };
 
     const newUser = new userModel(payload);
-    const savedUser = await newUser.save();
-    const verifyLink = `${process.env.FRONTEND_URL}/verify-email?code=${savedUser._id}`;
+    await newUser.save();
+    const verifyLink = `${process.env.FRONTEND_URL}/verify-email?code=${emailVerificationCode}`;
 
     sendEmail({
       to: email,
@@ -106,7 +115,7 @@ export const registerController = async (request, response) => {
       html: verifyEmailTemplate({ name: name, link: verifyLink }),
     });
 
-    return response.status(200).json({
+    return response.status(201).json({
       message: "Registered Successfully",
       error: false,
       success: true,
@@ -122,18 +131,32 @@ export const registerController = async (request, response) => {
 
 export const verifyEmailController = async (request, response) => {
   try {
-    const { userId } = request.body;
-    const user = await userModel.findOne({ _id: userId });
+    const { verificationCode } = request.body;
+    const user = await userModel.findOne({
+      "email.verificationCode": verificationCode,
+    });
 
     if (!user) {
-      return response.status(400).json({
+      return response.status(404).json({
         message: "Invalid token, failed to verify",
         error: true,
         success: false,
       });
     }
 
-    await userModel.findByIdAndUpdate(userId, { "email.verified": true });
+    if (user.email.verificationExpiry < Date.now()) {
+      return response.status(400).json({
+        message: "Expired token, failed to verify",
+        error: true,
+        success: false,
+      });
+    }
+
+    user.email.verified = true;
+    user.email.verificationCode = undefined;
+    user.email.verificationExpiry = undefined;
+
+    await user.save();
 
     return response.status(200).json({
       message: "Email verified successfully",
@@ -149,7 +172,7 @@ export const verifyEmailController = async (request, response) => {
   }
 };
 
-export const logoutHandler = async (request, response) => {
+export const logoutController = async (request, response) => {
   try {
     const cookieOptions = {
       httpOnly: true,
@@ -180,32 +203,40 @@ export const logoutHandler = async (request, response) => {
 
 export const updateUserController = async (request, response) => {
   try {
-    const { userId, name, email, password, avatarUrl, mobile, upiId } =
-      request.body;
+    const { name, email, password, avatarUrl, mobile, upiId } = request.body;
 
-    const user = await userModel.find({ "email.value": email });
+    const user = await userModel.findById(request.userId);
     if (user) {
-      return response.status(400).json({
+      return response.status(409).json({
         message: "This email is already in use",
         error: true,
         success: false,
       });
     }
 
-    let hashPassword = "";
-    if (password) {
-      const salt = await bcrypt.genSalt(10);
-      hashPassword = await bcrypt.hash(password, salt);
+    if (email) {
+      const emailVerificationCode = crypto.randomBytes(32).toString("hex");
+      const emailVerificationExpiry = Date.now() + 1000 * 60 * 60 * 24; // 1 day
+      user.email = {
+        value: email,
+        verified: false,
+        verificationCode: emailVerificationCode,
+        verificationExpiry: emailVerificationExpiry,
+      };
     }
 
-    await userModel.findByIdAndUpdate(userId, {
-      ...(name && { name: name }),
-      ...(email && { email: { value: email, verified: false } }),
-      ...(password && { password: hashPassword }),
-      ...(avatarUrl && { avatarUrl: avatarUrl }),
-      ...(mobile && { mobile: mobile }),
-      ...(upiId && { upiId: upiId }),
-    });
+    if (password) {
+      const salt = await bcryptjs.genSalt(10);
+      const hashPassword = await bcryptjs.hash(password, salt);
+      user.password = hashPassword;
+    }
+
+    if (name) user.name = name;
+    if (avatarUrl) user.avatarUrl = avatarUrl;
+    if (mobile) user.mobile = mobile;
+    if (upiId) user.upiId = upiId;
+
+    await user.save();
 
     return response.status(200).json({
       message: "User updated successfully",
@@ -236,15 +267,14 @@ export const forgotPasswordController = async (request, response) => {
     }
 
     const otp = generateOTP();
-    const expiryTime = new Date(Date.now() + 60 * 60 * 1000);
+    const expiryTime = new Date(Date.now() + 1000 * 60 * 60); // 1 hour
 
-    await userModel.findByIdAndUpdate(user._id, {
-      otp: {
-        value: otp,
-        timeStamp: expiryTime,
-      },
-    });
-    console.log(email);
+    user.otp = {
+      value: otp,
+      verificationExpiry: expiryTime,
+      verified: false,
+    };
+    await user.save();
 
     sendEmail({
       to: email,
@@ -261,7 +291,6 @@ export const forgotPasswordController = async (request, response) => {
       error: false,
     });
   } catch (error) {
-    console.log(error);
     return response.status(500).json({
       error: error.message,
       success: false,
@@ -270,7 +299,7 @@ export const forgotPasswordController = async (request, response) => {
   }
 };
 
-export const verifyForgotPWD = async (request, response) => {
+export const verifyForgotPWDController = async (request, response) => {
   try {
     const { email, otp } = request.body;
 
@@ -290,9 +319,8 @@ export const verifyForgotPWD = async (request, response) => {
         error: true,
       });
     }
-    const currTime = new Date(Date.now());
 
-    if (currTime > user.otp.timeStamp) {
+    if (user.otp.verificationExpiry < Date.now()) {
       return response.status(400).json({
         message: "OTP has expired please create new OTP",
         success: false,
@@ -300,7 +328,8 @@ export const verifyForgotPWD = async (request, response) => {
       });
     }
 
-    await userModel.findByIdAndUpdate(user._id, { "otp.verified": true });
+    user.otp.verified = true;
+    await user.save();
 
     return response.status(200).json({
       message: "Can change your password",
@@ -316,7 +345,7 @@ export const verifyForgotPWD = async (request, response) => {
   }
 };
 
-export const resetPWD = async (request, response) => {
+export const resetPWDController = async (request, response) => {
   try {
     const { email, newPassword, confirmPassword } = request.body;
 
@@ -355,15 +384,14 @@ export const resetPWD = async (request, response) => {
     const salt = await bcryptjs.genSalt(10);
     const hashPassword = await bcryptjs.hash(newPassword, salt);
 
-    await userModel.findByIdAndUpdate(user._id, {
-      password: hashPassword,
-      "opt.verified": false,
-    });
+    user.password = hashPassword;
+    user.otp = undefined;
+    await user.save();
 
     return response.status(200).json({
       message: "Password is successfully changed",
       success: true,
-      error: true,
+      error: false,
     });
   } catch (error) {
     return response.status(500).json({
