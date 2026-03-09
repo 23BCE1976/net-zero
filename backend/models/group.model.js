@@ -11,14 +11,14 @@ const groupSchema = new mongoose.Schema(
     },
     admin: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "user",
+      ref: "User",
       required: [true, "A group admin is required"],
     },
     members: {
       type: [
         {
           type: mongoose.Schema.Types.ObjectId,
-          ref: "user",
+          ref: "User",
         },
       ],
       default: [],

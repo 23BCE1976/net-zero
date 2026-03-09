@@ -10,6 +10,12 @@ import verifyEmailTemplate from "../utils/verifyEmailTemplate.js";
 import resetPwdTemplate from "../utils/resetPwdTemplate.js";
 import generateOTP from "../utils/generateOTP.js";
 
+const cookieOptions = {
+  httpOnly: true,
+  secure: true,
+  sameSite: "None",
+};
+
 export const loginController = async (request, response) => {
   try {
     const { email, password } = request.body;
@@ -31,6 +37,14 @@ export const loginController = async (request, response) => {
       });
     }
 
+    if (!user.email.verified) {
+      return response.status(403).json({
+        message: "Please verify your email first",
+        error: true,
+        success: false,
+      });
+    }
+
     const checkPassword = await bcryptjs.compare(password, user.password);
 
     if (!checkPassword) {
@@ -44,14 +58,8 @@ export const loginController = async (request, response) => {
     const accessToken = generateAccessToken(user._id);
     const refreshToken = await generateRefreshToken(user._id);
 
-    const cookieSettings = {
-      httpOnly: true,
-      secure: true,
-      sameSite: "None",
-    };
-
-    response.cookie("accessToken", accessToken, cookieSettings);
-    response.cookie("refreshToken", refreshToken, cookieSettings);
+    response.cookie("accessToken", accessToken, cookieOptions);
+    response.cookie("refreshToken", refreshToken, cookieOptions);
 
     return response.status(200).json({
       message: "User is logged in successfully",
@@ -174,18 +182,20 @@ export const verifyEmailController = async (request, response) => {
 
 export const logoutController = async (request, response) => {
   try {
-    const cookieOptions = {
-      httpOnly: true,
-      secure: true,
-      sameSite: "None",
-    };
-
     response.clearCookie("accessToken", cookieOptions);
     response.clearCookie("refreshToken", cookieOptions);
 
-    await userModel.findByIdAndUpdate(request.userId, {
+    const user = await userModel.findByIdAndUpdate(request.userId, {
       refreshToken: null,
     });
+
+    if (!user) {
+      return response.status(404).json({
+        message: "User not found",
+        error: true,
+        success: false,
+      });
+    }
 
     return response.status(200).json({
       message: "Logged out successfully",
@@ -206,23 +216,48 @@ export const updateUserController = async (request, response) => {
     const { name, email, password, avatarUrl, mobile, upiId } = request.body;
 
     const user = await userModel.findById(request.userId);
-    if (user) {
-      return response.status(409).json({
-        message: "This email is already in use",
+    if (!user) {
+      return response.status(404).json({
+        message: "User not found",
         error: true,
         success: false,
       });
     }
 
-    if (email) {
+    if (email && email !== user.email.value) {
+      const emailExists = await userModel.findOne({
+        "email.value": email,
+        _id: { $ne: request.userId },
+      });
+
+      if (emailExists) {
+        return response.status(409).json({
+          message: "This email is already in use",
+          error: true,
+          success: false,
+        });
+      }
+
       const emailVerificationCode = crypto.randomBytes(32).toString("hex");
-      const emailVerificationExpiry = Date.now() + 1000 * 60 * 60 * 24; // 1 day
+      const emailVerificationExpiry = Date.now() + 1000 * 60 * 60 * 24;
+
       user.email = {
         value: email,
         verified: false,
         verificationCode: emailVerificationCode,
         verificationExpiry: emailVerificationExpiry,
       };
+
+      const verifyLink = `${process.env.FRONTEND_URL}/verify-email?code=${emailVerificationCode}`;
+
+      sendEmail({
+        to: email,
+        subject: "Verify Email",
+        html: verifyEmailTemplate({
+          name: user.name,
+          link: verifyLink,
+        }),
+      });
     }
 
     if (password) {
@@ -292,7 +327,7 @@ export const forgotPasswordController = async (request, response) => {
     });
   } catch (error) {
     return response.status(500).json({
-      error: error.message,
+      message: "Internal Server Error",
       success: false,
       error: true,
     });
