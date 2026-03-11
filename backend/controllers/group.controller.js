@@ -3,7 +3,6 @@ import mongoose from "mongoose";
 
 import groupModel from "../models/group.model.js";
 import userModel from "../models/user.model.js";
-import { group } from "console";
 
 export const getAllController = async (request, response) => {
   try {
@@ -17,7 +16,7 @@ export const getAllController = async (request, response) => {
       });
     }
 
-    const groups = await groupModel.find({ members: user._id });
+    const groups = await groupModel.find({ "members.userId": user._id });
 
     return response.status(200).json({
       message: "Groups fetched successfully",
@@ -49,7 +48,18 @@ export const getOneController = async (request, response) => {
     }
 
     const group = await groupModel.findById(groupId);
-    const isMember = group?.members.some((member) => member.equals(user._id));
+
+    if (!group) {
+      return response.status(404).json({
+        message: "Group not found",
+        error: true,
+        success: false,
+      });
+    }
+
+    const isMember = group?.members.some((member) =>
+      member.userId.equals(user._id),
+    );
 
     if (!isMember) {
       return response.status(404).json({
@@ -119,7 +129,10 @@ export const createGroupController = async (request, response) => {
       name: name,
       type: type,
       admin: user._id,
-      members: uniqueMembers.map((id) => new mongoose.Types.ObjectId(id)),
+      members: uniqueMembers.map((id) => ({
+        userId: new mongoose.Types.ObjectId(id),
+        balance: 0,
+      })),
       joinCode: joinCode,
     };
 
@@ -166,7 +179,9 @@ export const addMemberControlller = async (request, response) => {
     });
   }
 
-  if (!group.members.some((id) => id.equals(userWhoIsAdding._id))) {
+  if (
+    !group.members.some((member) => member.userId.equals(userWhoIsAdding._id))
+  ) {
     return response.status(400).json({
       message: "Only members can add others to the group",
       error: true,
@@ -174,7 +189,7 @@ export const addMemberControlller = async (request, response) => {
     });
   }
 
-  if (group.members.some((id) => id.equals(userToBeAdded._id))) {
+  if (group.members.some((member) => member.userId.equals(userToBeAdded._id))) {
     return response.status(409).json({
       message: "User already exists in the group",
       error: true,
@@ -182,7 +197,10 @@ export const addMemberControlller = async (request, response) => {
     });
   }
 
-  group.members.push(userToBeAdded._id);
+  group.members.push({
+    userId: userToBeAdded._id,
+    balance: 0,
+  });
   await group.save();
 
   return response.status(200).json({
@@ -223,7 +241,9 @@ export const removeMemberControlller = async (request, response) => {
     });
   }
 
-  const idx = group.members.findIndex((id) => id.equals(userToBeRemoved._id));
+  const idx = group.members.findIndex((member) =>
+    member.userId.equals(userToBeRemoved._id),
+  );
 
   if (idx === -1) {
     return response.status(404).json({
@@ -265,7 +285,7 @@ export const joinControlller = async (request, response) => {
     });
   }
 
-  if (group.members.some((id) => id.equals(user._id))) {
+  if (group.members.some((member) => member.userId.equals(user._id))) {
     return response.status(409).json({
       message: "User already exists in the group",
       error: true,
@@ -273,7 +293,10 @@ export const joinControlller = async (request, response) => {
     });
   }
 
-  group.members.push(user._id);
+  group.members.push({
+    userId: user._id,
+    balance: 0,
+  });
   await group.save();
 
   return response.status(200).json({
@@ -313,7 +336,9 @@ export const leaveControlller = async (request, response) => {
     });
   }
 
-  const idx = group.members.findIndex((id) => id.equals(user._id));
+  const idx = group.members.findIndex((member) =>
+    member.userId.equals(user._id),
+  );
 
   if (idx === -1) {
     return response.status(404).json({

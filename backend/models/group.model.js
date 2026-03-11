@@ -17,8 +17,15 @@ const groupSchema = new mongoose.Schema(
     members: {
       type: [
         {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "User",
+          userId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+            required: true,
+          },
+          balance: {
+            type: Number,
+            default: 0, // +ve = should receive, -ve = owes
+          },
         },
       ],
       default: [],
