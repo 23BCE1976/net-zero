@@ -77,8 +77,8 @@ export const loginController = async (request, response) => {
 
 export const registerController = async (request, response) => {
   try {
-    const { name, email, password } = request.body;
-    if (!name || !email || !password) {
+    const { name, email, password, mobile, upiId } = request.body;
+    if (!name || !email || !password || !mobile || !upiId) {
       return response.status(409).json({
         message: "Please fill the required details",
         error: true,
@@ -111,6 +111,8 @@ export const registerController = async (request, response) => {
         verificationExpiry: emailVerificationExpiry,
       },
       password: hashPassword,
+      mobile: mobile,
+      upiId: upiId,
     };
 
     const newUser = new userModel(payload);
@@ -119,12 +121,39 @@ export const registerController = async (request, response) => {
 
     sendEmail({
       to: email,
-      subject: "Verify Email",
+      subject: "Email Verification",
       html: verifyEmailTemplate({ name: name, link: verifyLink }),
     });
 
     return response.status(201).json({
       message: "Registered Successfully",
+      error: false,
+      success: true,
+    });
+  } catch (error) {
+    return response.status(500).json({
+      message: "Internal Server Error",
+      error: true,
+      success: false,
+    });
+  }
+};
+
+export const profileController = async (request, response) => {
+  try {
+    const user = await userModel
+      .findById(request.userId)
+      .select("-password -refreshToken -otp");
+    if (!user) {
+      return response.status(404).json({
+        message: "User not found",
+        error: true,
+        success: false,
+      });
+    }
+    return response.status(200).json({
+      message: "Profile fetched successfully",
+      data: user,
       error: false,
       success: true,
     });
@@ -171,6 +200,34 @@ export const verifyEmailController = async (request, response) => {
       error: false,
       success: true,
     });
+  } catch (error) {
+    return response.status(500).json({
+      message: "Internal Server Error",
+      error: true,
+      success: false,
+    });
+  }
+};
+
+export const checkVerifyStatus = async (request, response) => {
+  try {
+    const { email } = request.query;
+    const user = await userModel.findOne({ "email.value": email });
+
+    if (!user) {
+      return response.status(404).json({
+        message: "User not found",
+        error: true,
+        success: false,
+      });
+    }
+
+    return response.status(200).json({
+      message: "Successfully retrived the verify status",
+      verified: user.email.verified,
+      error: false,
+      success: true,
+    })
   } catch (error) {
     return response.status(500).json({
       message: "Internal Server Error",
@@ -252,7 +309,7 @@ export const updateUserController = async (request, response) => {
 
       sendEmail({
         to: email,
-        subject: "Verify Email",
+        subject: "Email Verification",
         html: verifyEmailTemplate({
           name: user.name,
           link: verifyLink,

@@ -6,6 +6,8 @@ import {
   registerController,
   updateUserController,
   verifyEmailController,
+  checkVerifyStatus,
+  profileController,
   forgotPasswordController,
   verifyForgotPWDController,
   resetPWDController,
@@ -18,7 +20,9 @@ const userRouter = Router();
 userRouter.post("/login", loginController);
 userRouter.post("/register", registerController);
 userRouter.patch("/verify-email", verifyEmailController);
+userRouter.get("/check-verify-status", checkVerifyStatus);
 userRouter.post("/logout", auth, logoutController);
+userRouter.get("/profile", auth, profileController);
 userRouter.put("/edit", auth, updateUserController);
 userRouter.post("/forgot-password", forgotPasswordController);
 userRouter.post("/verify-forgot-password-otp", verifyForgotPWDController);

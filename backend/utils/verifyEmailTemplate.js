@@ -45,14 +45,6 @@ const verifyEmailTemplate = ({ name, link }) => `
           </a>
         </div>
 
-        <p style="font-size:14px; color:#666;">
-          If the button doesn't work, copy and paste this link into your browser:
-        </p>
-
-        <p style="font-size:14px; word-break:break-all;">
-          <a href="${link}" style="color:#4f46e5;">${link}</a>
-        </p>
-
       </div>
 
       <!-- Footer -->

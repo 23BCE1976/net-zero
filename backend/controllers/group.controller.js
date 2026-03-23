@@ -33,6 +33,54 @@ export const getAllController = async (request, response) => {
   }
 };
 
+export const getMembersController = async (request, response) => {
+  try {
+    const { groupId } = request.params;
+    const group = await groupModel.findById(groupId);
+    if (!group) {
+      return response.status(404).json({
+        message: "Group not found",
+        error: true,
+        success: false,
+      });
+    }
+    const isMember = group.members.some((m) => m.userId.equals(request.userId));
+    if (!isMember) {
+      return response.status(404).json({
+        message: "Group not found",
+        error: true,
+        success: false,
+      });
+    }
+    const userIds = group.members.map((m) => m.userId);
+    const users = await userModel
+      .find({ _id: { $in: userIds } })
+      .select("name email.value avatarUrl");
+    const data = group.members.map((m) => {
+      const u = users.find((u) => u._id.equals(m.userId));
+      return {
+        _id: m.userId,
+        name: u?.name || null,
+        email: u?.email?.value || null,
+        avatarUrl: u?.avatarUrl || null,
+        balance: m.balance,
+      };
+    });
+    return response.status(200).json({
+      message: "Members fetched",
+      data,
+      error: false,
+      success: true,
+    });
+  } catch (error) {
+    return response.status(500).json({
+      message: "Internal Server Error",
+      error: true,
+      success: false,
+    });
+  }
+};
+
 export const getOneController = async (request, response) => {
   try {
     const { groupId } = request.params;

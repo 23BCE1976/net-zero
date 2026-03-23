@@ -3,6 +3,7 @@ import { Router } from "express";
 import {
   getAllController,
   getOneController,
+  getMembersController,
   createGroupController,
   addMemberControlller,
   removeMemberControlller,
@@ -16,6 +17,7 @@ const groupRouter = Router();
 
 groupRouter.get("/", auth, getAllController);
 groupRouter.get("/:groupId", auth, getOneController);
+groupRouter.get("/:groupId/members", auth, getMembersController);
 groupRouter.post("/", auth, createGroupController);
 groupRouter.post("/add-member", auth, addMemberControlller);
 groupRouter.delete("/remove-member", auth, removeMemberControlller);

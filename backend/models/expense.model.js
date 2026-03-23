@@ -37,7 +37,7 @@ const expenseSchema = new mongoose.Schema(
         values: ["exact", "equal", "percentage", "ratio", "ai"],
         message: "Invalid split type",
       },
-      default: "exact",
+      required: true,
     },
     splits: [splitSchema],
   },

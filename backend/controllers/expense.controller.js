@@ -5,7 +5,7 @@ import expenseModel from "../models/expense.model.js";
 export const getAllController = async (request, response) => {
   try {
     const user = await userModel.findById(request.userId);
-    const { groupId } = request.body;
+    const { groupId } = request.query;
 
     if (!user) {
       return response.status(404).json({

@@ -52,9 +52,11 @@ const userSchema = new mongoose.Schema(
     },
     mobile: {
       type: String,
+      required: true,
     },
     upiId: {
       type: String,
+      required: true,
     },
     otp: {
       type: {
