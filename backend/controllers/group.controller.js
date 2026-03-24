@@ -4,7 +4,7 @@ import mongoose from "mongoose";
 import groupModel from "../models/group.model.js";
 import userModel from "../models/user.model.js";
 
-export const getAllController = async (request, response) => {
+export const getGroupsController = async (request, response) => {
   try {
     const user = await userModel.findById(request.userId);
 
@@ -16,59 +16,25 @@ export const getAllController = async (request, response) => {
       });
     }
 
-    const groups = await groupModel.find({ "members.userId": user._id });
+    const groups = await groupModel
+      .find({ "members.userId": user._id })
+      .populate({
+        path: "members.userId",
+        select: "name",
+      });
+
+    const formattedGroups = groups.map((group) => ({
+      ...group.toObject(),
+      members: group.members.map((member) => ({
+        id: member.userId._id,
+        name: member.userId.name,
+        balance: member.balance,
+      })),
+    }));
 
     return response.status(200).json({
       message: "Groups fetched successfully",
-      data: groups,
-      error: false,
-      success: true,
-    });
-  } catch (error) {
-    return response.status(500).json({
-      message: "Internal Server Error",
-      error: true,
-      success: false,
-    });
-  }
-};
-
-export const getMembersController = async (request, response) => {
-  try {
-    const { groupId } = request.params;
-    const group = await groupModel.findById(groupId);
-    if (!group) {
-      return response.status(404).json({
-        message: "Group not found",
-        error: true,
-        success: false,
-      });
-    }
-    const isMember = group.members.some((m) => m.userId.equals(request.userId));
-    if (!isMember) {
-      return response.status(404).json({
-        message: "Group not found",
-        error: true,
-        success: false,
-      });
-    }
-    const userIds = group.members.map((m) => m.userId);
-    const users = await userModel
-      .find({ _id: { $in: userIds } })
-      .select("name email.value avatarUrl");
-    const data = group.members.map((m) => {
-      const u = users.find((u) => u._id.equals(m.userId));
-      return {
-        _id: m.userId,
-        name: u?.name || null,
-        email: u?.email?.value || null,
-        avatarUrl: u?.avatarUrl || null,
-        balance: m.balance,
-      };
-    });
-    return response.status(200).json({
-      message: "Members fetched",
-      data,
+      data: formattedGroups,
       error: false,
       success: true,
     });
@@ -95,7 +61,10 @@ export const getOneController = async (request, response) => {
       });
     }
 
-    const group = await groupModel.findById(groupId);
+    const group = await groupModel.findById(groupId).populate({
+      path: "members.userId",
+      select: "name",
+    });
 
     if (!group) {
       return response.status(404).json({
@@ -117,9 +86,18 @@ export const getOneController = async (request, response) => {
       });
     }
 
+    const formattedGroup = {
+      ...group.toObject(),
+      members: group.members.map((member) => ({
+        id: member.userId._id,
+        name: member.userId.name,
+        balance: member.balance,
+      })),
+    };
+
     return response.status(200).json({
-      message: "Groups fetched successfully",
-      data: group,
+      message: "Group fetched successfully",
+      data: formattedGroup,
       error: false,
       success: true,
     });
@@ -171,7 +149,7 @@ export const createGroupController = async (request, response) => {
       });
     }
 
-    const joinCode = crypto.randomBytes(16).toString("hex");
+    const joinCode = crypto.randomBytes(3).toString("hex").toUpperCase();
 
     const payload = {
       name: name,

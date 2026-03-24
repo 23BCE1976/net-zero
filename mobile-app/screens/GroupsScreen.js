@@ -18,11 +18,9 @@ import api from "../api";
 
 function GroupCard({ group, userId, onPress }) {
   const meta = getGroupMeta(group.type);
-  const me = group.members?.find(
-    (m) => m.userId === userId || m.userId?._id === userId,
-  );
+  const me = group.members?.find((m) => m.id === userId);
   const bal = me?.balance || 0;
-  const isAdmin = group.admin === userId || group.admin?._id === userId;
+  const isAdmin = group.admin === userId;
 
   return (
     <Pressable onPress={onPress} style={styles.card}>
@@ -171,7 +169,10 @@ export default function GroupsScreen({ navigation }) {
               group={item}
               userId={userId}
               onPress={() =>
-                navigation.navigate("GroupDetail", { groupId: item._id })
+                navigation.navigate("GroupDetail", {
+                  groupId: item._id,
+                  userId,
+                })
               }
             />
           )}

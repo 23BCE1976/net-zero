@@ -18,14 +18,20 @@ export default function FloatingInput({
   keyboardType = "default",
   autoCapitalize = "none",
   error,
+  prefix,
+  multiline,
 }) {
   const [focused, setFocused] = useState(false);
   const [passwordVisible, setPasswordVisible] = useState(false);
+
   const labelAnim = useRef(new Animated.Value(value ? 1 : 0)).current;
   const borderAnim = useRef(new Animated.Value(0)).current;
+  const prefixAnim = useRef(new Animated.Value(value ? 1 : 0)).current;
+
   const inputRef = useRef(null);
 
   const isActive = focused || value?.length > 0;
+  const hasPrefix = !!prefix;
 
   useEffect(() => {
     Animated.parallel([
@@ -38,6 +44,11 @@ export default function FloatingInput({
         toValue: focused ? 1 : 0,
         duration: 200,
         useNativeDriver: false,
+      }),
+      Animated.timing(prefixAnim, {
+        toValue: isActive ? 1 : 0,
+        duration: 150,
+        useNativeDriver: true,
       }),
     ]).start();
   }, [focused, value]);
@@ -52,6 +63,8 @@ export default function FloatingInput({
     outputRange: [16, 11],
   });
 
+  const labelLeft = 16;
+
   const borderColor = error
     ? colors.error
     : borderAnim.interpolate({
@@ -61,17 +74,45 @@ export default function FloatingInput({
 
   return (
     <View style={styles.wrapper}>
-      <Animated.View style={[styles.container, { borderColor }]}>
+      <Animated.View
+        style={[
+          styles.container,
+          { borderColor },
+          multiline && styles.textAreaContainer,
+        ]}
+      >
         <Pressable
-          style={styles.pressable}
+          style={[styles.pressable, multiline && styles.textAreaPressable]}
           onPress={() => inputRef.current?.focus()}
         >
+          {hasPrefix && (
+            <Animated.Text
+              style={[
+                styles.prefix,
+                {
+                  opacity: prefixAnim,
+                  transform: [
+                    {
+                      translateX: prefixAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [-6, 0],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            >
+              {prefix}
+            </Animated.Text>
+          )}
+
           <Animated.Text
             style={[
               styles.label,
               {
                 top: labelTop,
                 fontSize: labelSize,
+                left: labelLeft,
                 color: error
                   ? colors.error
                   : focused
@@ -82,9 +123,14 @@ export default function FloatingInput({
           >
             {label}
           </Animated.Text>
+
           <TextInput
             ref={inputRef}
-            style={styles.input}
+            style={[
+              styles.input,
+              hasPrefix && styles.inputWithPrefix,
+              multiline && styles.textAreaInput,
+            ]}
             value={value}
             onChangeText={onChangeText}
             onFocus={() => setFocused(true)}
@@ -94,8 +140,11 @@ export default function FloatingInput({
             autoCapitalize={autoCapitalize}
             selectionColor={colors.accent}
             cursorColor={colors.accent}
+            multiline={multiline}
           />
         </Pressable>
+
+        {/* ✅ Password Toggle */}
         {secureTextEntry && (
           <Pressable
             onPress={() => setPasswordVisible((v) => !v)}
@@ -110,6 +159,7 @@ export default function FloatingInput({
           </Pressable>
         )}
       </Animated.View>
+
       {error && <Text style={styles.error}>{error}</Text>}
     </View>
   );
@@ -119,6 +169,7 @@ const styles = StyleSheet.create({
   wrapper: {
     marginBottom: 20,
   },
+
   container: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
@@ -127,17 +178,37 @@ const styles = StyleSheet.create({
     alignItems: "center",
     minHeight: 58,
   },
+
   pressable: {
     flex: 1,
     paddingHorizontal: 16,
     justifyContent: "center",
     minHeight: 58,
   },
-  label: {
+
+  textAreaContainer: {
+    minHeight: 100,
+    alignItems: "flex-start",
+  },
+
+  textAreaPressable: {
+    minHeight: 100,
+  },
+
+  prefix: {
     position: "absolute",
     left: 16,
+    top: 22,
+    fontSize: 16,
+    fontWeight: "500",
+    color: colors.textMuted,
+  },
+
+  label: {
+    position: "absolute",
     fontWeight: "500",
   },
+
   input: {
     ...typography.body,
     color: colors.textPrimary,
@@ -145,12 +216,24 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     margin: 0,
     padding: 0,
-    paddingHorizontal: 0,
   },
+
+  inputWithPrefix: {
+    paddingLeft: 28,
+  },
+
+  textAreaInput: {
+    minHeight: 60,
+    textAlignVertical: "top",
+    paddingTop: 28,
+    paddingBottom: 12,
+  },
+
   eyeBtn: {
     paddingRight: 16,
     paddingLeft: 8,
   },
+
   error: {
     ...typography.caption,
     color: colors.error,

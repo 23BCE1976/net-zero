@@ -1,9 +1,8 @@
 import { Router } from "express";
 
 import {
-  getAllController,
+  getGroupsController,
   getOneController,
-  getMembersController,
   createGroupController,
   addMemberControlller,
   removeMemberControlller,
@@ -15,9 +14,8 @@ import auth from "../middlewares/auth.js";
 
 const groupRouter = Router();
 
-groupRouter.get("/", auth, getAllController);
+groupRouter.get("/", auth, getGroupsController);
 groupRouter.get("/:groupId", auth, getOneController);
-groupRouter.get("/:groupId/members", auth, getMembersController);
 groupRouter.post("/", auth, createGroupController);
 groupRouter.post("/add-member", auth, addMemberControlller);
 groupRouter.delete("/remove-member", auth, removeMemberControlller);

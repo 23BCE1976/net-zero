@@ -63,7 +63,7 @@ function MemberRow({ member, isAdmin }) {
 }
 
 function ExpenseRow({ expense, members }) {
-  const payer = members.find((m) => m._id === expense.paidBy);
+  const payer = members.find((m) => m.id === expense.paidBy);
   return (
     <View style={styles.expenseRow}>
       <View style={styles.expenseIcon}>
@@ -85,11 +85,9 @@ function ExpenseRow({ expense, members }) {
 }
 
 export default function GroupDetailScreen({ route, navigation }) {
-  const { groupId } = route.params;
+  const { groupId, userId } = route.params;
   const [group, setGroup] = useState(null);
   const [expenses, setExpenses] = useState([]);
-  const [members, setMembers] = useState([]);
-  const [userId, setUserId] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("members");
@@ -98,29 +96,11 @@ export default function GroupDetailScreen({ route, navigation }) {
 
   const fetchData = async () => {
     try {
-      const [profileRes, groupRes, expensesRes] = await Promise.all([
-        api.get("/api/user/profile"),
+      const [groupRes, expensesRes] = await Promise.all([
         api.get(`/api/group/${groupId}`),
         api.get("/api/expense", { params: { groupId } }),
       ]);
-      if (profileRes.data.success) setUserId(profileRes.data.data._id);
-      if (groupRes.data.success) {
-        setGroup(groupRes.data.data);
-        // members details fetched via a dedicated endpoint
-        try {
-          const membersRes = await api.get(`/api/group/${groupId}/members`);
-          if (membersRes.data.success) setMembers(membersRes.data.data);
-        } catch (_) {
-          // fallback: use group.members with userId only
-          setMembers(
-            groupRes.data.data.members.map((m) => ({
-              _id: m.userId,
-              name: null,
-              balance: m.balance,
-            })),
-          );
-        }
-      }
+      if (groupRes.data.success) setGroup(groupRes.data.data);
       if (expensesRes.data.success) setExpenses(expensesRes.data.data);
     } catch (_) {}
     setLoading(false);
@@ -194,12 +174,7 @@ export default function GroupDetailScreen({ route, navigation }) {
 
   const meta = getGroupMeta(group?.type);
   const isAdmin = group?.admin === userId;
-  const membersWithBal = members.map((m) => {
-    const gm = group?.members?.find(
-      (gm) => gm.userId === m._id || gm.userId?._id === m._id,
-    );
-    return { ...m, balance: gm?.balance || 0 };
-  });
+  const groupMembers = group?.members || [];
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -282,6 +257,7 @@ export default function GroupDetailScreen({ route, navigation }) {
                 navigation.navigate("AddExpense", {
                   groupId,
                   groupName: group?.name,
+                  userId,
                 })
               }
               style={styles.quickBtn}
@@ -295,7 +271,8 @@ export default function GroupDetailScreen({ route, navigation }) {
               onPress={() =>
                 navigation.navigate("SettleUp", {
                   groupId,
-                  members: membersWithBal,
+                  members: groupMembers,
+                  userId,
                 })
               }
               style={styles.quickBtn}
@@ -328,11 +305,11 @@ export default function GroupDetailScreen({ route, navigation }) {
           </View>
 
           {tab === "members" &&
-            membersWithBal.map((m) => (
+            groupMembers.map((m) => (
               <MemberRow
-                key={m._id}
+                key={m.id}
                 member={m}
-                isAdmin={group?.admin === m._id}
+                isAdmin={group?.admin === m.id}
               />
             ))}
 
@@ -351,7 +328,7 @@ export default function GroupDetailScreen({ route, navigation }) {
             [...expenses]
               .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
               .map((e) => (
-                <ExpenseRow key={e._id} expense={e} members={members} />
+                <ExpenseRow key={e._id} expense={e} members={groupMembers} />
               ))}
         </ScrollView>
       </Animated.View>

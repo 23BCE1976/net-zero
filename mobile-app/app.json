@@ -36,12 +36,20 @@
               "pathPrefix": "/verify-email"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "954b19a4-db7a-403d-ad85-4f78933568c1"
+      }
     }
   }
 }

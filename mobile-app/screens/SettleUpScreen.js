@@ -7,7 +7,7 @@ import {
   Animated,
   Alert,
   StyleSheet,
-  Linking,
+  Linking
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -19,10 +19,10 @@ import api from "../api";
 
 function PersonCard({ member, selected, onPress }) {
   const bal = member.balance || 0;
-  const active = selected === member._id;
+  const active = selected === member.id;
   return (
     <Pressable
-      onPress={() => onPress(member._id)}
+      onPress={() => onPress(member.id)}
       style={[styles.personCard, active && styles.personCardActive]}
     >
       <View style={styles.personAvatar}>
@@ -50,9 +50,13 @@ function PersonCard({ member, selected, onPress }) {
           ? "Settled"
           : `${bal > 0 ? "gets" : "owes"} ₹${Math.abs(bal).toLocaleString("en-IN")}`}
       </Text>
-      {active && (
+      {active ? (
         <View style={styles.checkBadge}>
           <Ionicons name="checkmark" size={14} color={colors.bg} />
+        </View>
+      ) : (
+        <View style={styles.uncheckBadge}>
+          <Ionicons name="ellipse-outline" size={14} color={colors.bg} />
         </View>
       )}
     </Pressable>
@@ -61,12 +65,12 @@ function PersonCard({ member, selected, onPress }) {
 
 export default function SettleUpScreen({ route, navigation }) {
   const routeGroupId = route?.params?.groupId;
+  const routeUserId = route?.params?.userId;
   const routeMembers = route?.params?.members;
 
   const [groups, setGroups] = useState([]);
   const [groupId, setGroupId] = useState(routeGroupId || "");
   const [members, setMembers] = useState(routeMembers || []);
-  const [userId, setUserId] = useState(null);
   const [receiverId, setReceiverId] = useState("");
   const [amount, setAmount] = useState("");
   const [loading, setLoading] = useState(false);
@@ -84,41 +88,33 @@ export default function SettleUpScreen({ route, navigation }) {
 
   useFocusEffect(
     useCallback(() => {
-      (async () => {
-        try {
-          const profileRes = await api.get("/api/user/profile");
-          if (profileRes.data.success) setUserId(profileRes.data.data._id);
-          if (!routeGroupId) {
-            const { data } = await api.get("/api/group");
+      if (!routeGroupId) {
+        api
+          .get("/api/group")
+          .then(({ data }) => {
             if (data.success) setGroups(data.data);
-          }
-        } catch (_) {}
-      })();
+          })
+          .catch(() => {});
+      }
     }, []),
   );
 
   useEffect(() => {
     if (!groupId || routeMembers) return;
-    (async () => {
-      try {
-        const { data } = await api.get(`/api/group/${groupId}/members`);
-        if (data.success) {
-          const groupRes = await api.get(`/api/group/${groupId}`);
-          const gMembers = groupRes.data?.data?.members || [];
-          setMembers(
-            data.data.map((m) => {
-              const gm = gMembers.find(
-                (g) => g.userId === m._id || g.userId?._id === m._id,
-              );
-              return { ...m, balance: gm?.balance || 0 };
-            }),
-          );
-        }
-      } catch (_) {}
-    })();
-  }, [groupId]);
+    const found = groups.find((g) => g._id === groupId);
+    if (found) {
+      setMembers(found.members);
+      return;
+    }
+    api
+      .get(`/api/group/${groupId}`)
+      .then(({ data }) => {
+        if (data.success) setMembers(data.data.members);
+      })
+      .catch(() => {});
+  }, [groupId, groups]);
 
-  const otherMembers = members.filter((m) => m._id !== userId);
+  const otherMembers = members.filter((m) => m.id !== routeUserId);
 
   const handlePay = async () => {
     const e = {};
@@ -131,7 +127,7 @@ export default function SettleUpScreen({ route, navigation }) {
     }
     setLoading(true);
     try {
-      const supported = await openUPI();
+      const supported = await openUPI(amount);
       if (!supported) return;
 
       const { data } = await api.post("/api/expense/pay", {
@@ -151,17 +147,30 @@ export default function SettleUpScreen({ route, navigation }) {
     }
   };
 
-  const openUPI = async () => {
-    const upiUrl = process.env.SAMPLE_UPI_URL;
-    const supported = await Linking.canOpenURL(upiUrl);
+  const openUPI = async (amount) => {
+    const { data } = await api.get(`/api/user/profile?userId=${receiverId}`);
+    const receiver = data.data;
 
-    if (supported) {
-      await Linking.openURL(upiUrl);
-    } else {
-      Alert.alert("Error", "No UPI app found");
+    const upiUrl =
+      `upi://pay?` +
+      `pa=${encodeURIComponent(receiver.upiId)}` +
+      `&pn=${encodeURIComponent(receiver.name)}` +
+      `&am=${encodeURIComponent(String(amount))}` +
+      `&cu=INR` +
+      `&tn=${encodeURIComponent("Settle Expense")}`;
+
+    try {
+      const supported = await Linking.canOpenURL(upiUrl);
+      if (supported) {
+        await Linking.openURL(upiUrl);
+      } else {
+        Alert.alert("Error", "No UPI app found");
+      }
+      return supported;
+    } catch (err) {
+      console.log(err);
+      return false;
     }
-
-    return supported;
   };
 
   return (
@@ -232,7 +241,7 @@ export default function SettleUpScreen({ route, navigation }) {
               <View style={styles.personGrid}>
                 {otherMembers.map((m) => (
                   <PersonCard
-                    key={m._id}
+                    key={m.id}
                     member={m}
                     selected={receiverId}
                     onPress={setReceiverId}
@@ -263,7 +272,7 @@ export default function SettleUpScreen({ route, navigation }) {
 
           {receiverId && (
             <PrimaryButton
-              title="Pay Now"
+              title="Record Payment"
               onPress={handlePay}
               loading={loading}
             />
@@ -375,6 +384,14 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 12,
     backgroundColor: colors.accent,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  uncheckBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.surfaceElevated,
     alignItems: "center",
     justifyContent: "center",
   },

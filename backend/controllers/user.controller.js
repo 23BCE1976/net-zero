@@ -141,9 +141,12 @@ export const registerController = async (request, response) => {
 
 export const profileController = async (request, response) => {
   try {
+    let { userId } = request.query;
+    if (!userId) userId = request.userId;
+
     const user = await userModel
-      .findById(request.userId)
-      .select("-password -refreshToken -otp");
+      .findById(userId)
+      .select("-password -refreshToken -otp"); // hide these attributes
     if (!user) {
       return response.status(404).json({
         message: "User not found",

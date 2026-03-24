@@ -110,9 +110,7 @@ function QuickAction({ icon, label, color, onPress }) {
 
 function GroupRow({ group, userId, onPress }) {
   const meta = getGroupMeta(group.type);
-  const me = group.members?.find(
-    (m) => m.userId === userId || m.userId?._id === userId,
-  );
+  const me = group.members?.find((m) => m.id === userId);
   const bal = me?.balance || 0;
 
   return (
@@ -207,9 +205,7 @@ export default function HomeScreen({ navigation }) {
   let youOwe = 0;
   let youAreOwed = 0;
   groups.forEach((g) => {
-    const me = g.members?.find(
-      (m) => m.userId === userId || m.userId?._id === userId,
-    );
+    const me = g.members?.find((m) => m.id === userId);
     if (!me) return;
     if (me.balance > 0) youAreOwed += me.balance;
     else youOwe += Math.abs(me.balance);
@@ -278,13 +274,13 @@ export default function HomeScreen({ navigation }) {
               icon="add-circle-outline"
               label="Expense"
               color="#5B8DEF"
-              onPress={() => navigation.navigate("AddExpense")}
+              onPress={() => navigation.navigate("AddExpense", { userId })}
             />
             <QuickAction
               icon="swap-horizontal-outline"
               label="Settle Up"
               color={colors.accent}
-              onPress={() => navigation.navigate("SettleUp")}
+              onPress={() => navigation.navigate("SettleUp", { userId })}
             />
             <QuickAction
               icon="people-outline"
@@ -311,7 +307,10 @@ export default function HomeScreen({ navigation }) {
                   group={g}
                   userId={userId}
                   onPress={() =>
-                    navigation.navigate("GroupDetail", { groupId: g._id })
+                    navigation.navigate("GroupDetail", {
+                      groupId: g._id,
+                      userId,
+                    })
                   }
                 />
               ))}
